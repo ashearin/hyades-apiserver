@@ -19,9 +19,6 @@
 package org.dependencytrack.model;
 
 import alpine.common.validation.RegexSequence;
-import alpine.model.LdapUser;
-import alpine.model.ManagedUser;
-import alpine.model.OidcUser;
 import alpine.server.json.TrimmedStringDeserializer;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -44,8 +41,7 @@ import javax.jdo.annotations.Persistent;
 import javax.jdo.annotations.PrimaryKey;
 import java.io.Serializable;
 import java.security.Permission;
-import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 /**
  * Model for tracking roles. Roles map a set of permissions
@@ -60,29 +56,8 @@ import java.util.Map;
                 @Persistent(name = "name"),
                 @Persistent(name = "description"),
                 @Persistent(name = "permissions"),
-                @Persistent(name = "projects"),
-                @Persistent(name = "oidcUserProjectPermissions"),
-                @Persistent(name = "ldapUserProjectPermissions"),
-                @Persistent(name = "managedUserProjectPermissions")
-        }),
-        @FetchGroup(name = "OIDC_ACCESS", members = {
-            @Persistent(name = "name"),
-            @Persistent(name = "permissions"),
-            @Persistent(name = "projects"),
-            @Persistent(name = "oidcUserProjectPermissions"),
-        }),
-        @FetchGroup(name = "LDAP_ACCESS", members = {
-            @Persistent(name = "name"),
-            @Persistent(name = "permissions"),
-            @Persistent(name = "projects"),
-            @Persistent(name = "ldapUserProjectPermissions"),
-        }),
-        @FetchGroup(name = "MANAGED_ACCESS", members = {
-            @Persistent(name = "name"),
-            @Persistent(name = "permissions"),
-            @Persistent(name = "projects"),
-            @Persistent(name = "managedUserProjectPermissions"),
-        }),
+                @Persistent(name = "projects")
+        })
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Role implements Serializable {
@@ -93,19 +68,7 @@ public class Role implements Serializable {
      * Defines JDO fetch groups for this class.
      */
     public enum FetchGroup {
-        ALL,
-        OIDC_ACCESS,
-        LDAP_ACCESS,
-        MANAGED_ACCESS
-    }
-
-    record OidcUserProject(OidcUser oidcUser, Project project) {
-    }
-
-    record LdapUserProject(LdapUser ldapUser, Project project) {
-    }
-
-    record ManagedUserProject(ManagedUser managedUser, Project project) {
+        ALL
     }
 
     @PrimaryKey
@@ -133,26 +96,12 @@ public class Role implements Serializable {
     @Join(column = "ROLE_ID")
     @Element(column = "PERMISSION_ID")
     @Order(extensions = @Extension(vendorName = "datanucleus", key = "list-ordering", value = "name ASC"))
-    private List<Permission> permissions;
+    private Set<Permission> permissions;
 
     @Persistent(defaultFetchGroup = "true")
     @Element(column = "PROJECT_ID")
     @Order(extensions = @Extension(vendorName = "datanucleus", key = "list-ordering", value = "name ASC"))
-    private List<Project> projects;
-
-    @Persistent(table = "OIDCUSERS_PROJECTS_ROLES")
-    private Map<OidcUserProject, List<Permission>> oidcUserProjectPermissions;
-
-    @Persistent(table = "LDAPUSERS_PROJECTS_ROLES")
-    private Map<LdapUserProject, List<Permission>> ldapUserProjectPermissions;
-
-    @Persistent(table = "MANAGEDUSERS_PROJECTS_ROLES")
-    private Map<ManagedUserProject, List<Permission>> managedUserProjectPermissions;
-
-    // @Persistent(mappedBy = "teams")
-    // @Order(extensions = @Extension(vendorName = "datanucleus", key =
-    // "list-ordering", value = "username ASC"))
-    // private List<OidcUser> oidcUsers;
+    private Set<Project> projects;
 
     public long getId() {
         return id;
@@ -176,6 +125,38 @@ public class Role implements Serializable {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Set<Project> getProjects() {
+        return projects;
+    }
+    
+    public void setProjects(Set<Project> projects) {
+        this.projects = projects;
+    }
+    
+    public Set<Permission> getPermissions() {
+        return permissions;
+    }
+    
+    public void setPermissions(Set<Permission> permissions) {
+        this.permissions = permissions;
+    }
+
+    public void addProject(Project project) {
+        this.projects.add(project);
+    }
+    
+    public void removeProject(Project project) {
+        this.projects.remove(project);
+    }
+    
+    public void addPermission(Permission permission) {
+        this.permissions.add(permission);
+    }
+    
+    public void removePermission(Permission permission) {
+        this.permissions.remove(permission);
     }
 
     @Override
