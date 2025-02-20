@@ -1,0 +1,171 @@
+/*
+ * This file is part of Dependency-Track.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (c) OWASP Foundation. All Rights Reserved.
+ */
+package org.dependencytrack.model;
+
+import alpine.common.validation.RegexSequence;
+import alpine.server.json.TrimmedStringDeserializer;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+import javax.jdo.annotations.Column;
+import javax.jdo.annotations.Element;
+import javax.jdo.annotations.Extension;
+import javax.jdo.annotations.FetchGroup;
+import javax.jdo.annotations.FetchGroups;
+import javax.jdo.annotations.IdGeneratorStrategy;
+import javax.jdo.annotations.Index;
+import javax.jdo.annotations.Join;
+import javax.jdo.annotations.Order;
+import javax.jdo.annotations.PersistenceCapable;
+import javax.jdo.annotations.Persistent;
+import javax.jdo.annotations.PrimaryKey;
+import java.io.Serializable;
+import java.security.Permission;
+import java.util.Set;
+
+/**
+ * Model for tracking roles. Roles map a set of permissions
+ * to a user within the scope of a Role.
+ *
+ * @author Allen Shearin
+ * @since 5.6.0
+ */
+@PersistenceCapable
+@FetchGroups({
+        @FetchGroup(name = "ALL", members = {
+                @Persistent(name = "name"),
+                @Persistent(name = "description"),
+                @Persistent(name = "permissions"),
+                @Persistent(name = "projects")
+        })
+})
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class Role implements Serializable {
+
+    private static final long serialVersionUID = -7592438796591673355L;
+
+    /**
+     * Defines JDO fetch groups for this class.
+     */
+    public enum FetchGroup {
+        ALL
+    }
+
+    @PrimaryKey
+    @Persistent(valueStrategy = IdGeneratorStrategy.NATIVE)
+    @JsonIgnore
+    private long id;
+
+    @Persistent
+    @Index(name = "ROLE_NAME_IDX")
+    @Column(name = "NAME", jdbcType = "VARCHAR", allowsNull = "false")
+    @NotBlank
+    @Size(min = 1, max = 255)
+    @JsonDeserialize(using = TrimmedStringDeserializer.class)
+    @Pattern(regexp = RegexSequence.Definition.PRINTABLE_CHARS, message = "The name may only contain printable characters")
+    private String name;
+
+    @Persistent
+    @Column(name = "DESCRIPTION", jdbcType = "VARCHAR")
+    @JsonDeserialize(using = TrimmedStringDeserializer.class)
+    @Pattern(regexp = RegexSequence.Definition.PRINTABLE_CHARS, message = "The description may only contain printable characters")
+    private String description;
+
+    @Persistent(table = "ROLES_PERMISSIONS", defaultFetchGroup = "true")
+    @Index(name = "ROLES_PERMISSIONS_IDX")
+    @Join(column = "ROLE_ID")
+    @Element(column = "PERMISSION_ID")
+    @Order(extensions = @Extension(vendorName = "datanucleus", key = "list-ordering", value = "name ASC"))
+    private Set<Permission> permissions;
+
+    @Persistent(defaultFetchGroup = "true")
+    @Element(column = "PROJECT_ID")
+    @Order(extensions = @Extension(vendorName = "datanucleus", key = "list-ordering", value = "name ASC"))
+    private Set<Project> projects;
+
+    public long getId() {
+        return id;
+    }
+
+    public void setId(long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public Set<Project> getProjects() {
+        return projects;
+    }
+    
+    public void setProjects(Set<Project> projects) {
+        this.projects = projects;
+    }
+    
+    public Set<Permission> getPermissions() {
+        return permissions;
+    }
+    
+    public void setPermissions(Set<Permission> permissions) {
+        this.permissions = permissions;
+    }
+
+    public void addProject(Project project) {
+        this.projects.add(project);
+    }
+    
+    public void removeProject(Project project) {
+        this.projects.remove(project);
+    }
+    
+    public void addPermission(Permission permission) {
+        this.permissions.add(permission);
+    }
+    
+    public void removePermission(Permission permission) {
+        this.permissions.remove(permission);
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(getName());
+        if (getDescription() != null) {
+            sb.append(" : ").append(getDescription());
+        }
+        return sb.toString();
+    }
+}
