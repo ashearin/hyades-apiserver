@@ -637,7 +637,7 @@
                                  referencedTableName="WORKFLOW_STATE" validate="true"/>
     </changeSet>
 
-<changeSet id="v5.6.0-13-dev" author="pkwiatkowski1">
+    <changeSet id="v5.6.0-13-dev" author="pkwiatkowski1">
         <addColumn tableName="APIKEY">
             <column name="IS_LEGACY" type="BOOLEAN" defaultValueBoolean="false">
                 <constraints nullable="false"/>
@@ -823,5 +823,6 @@
         <createIndex indexName="OIDCUSERS_PROJECTS_ROLES_ROLE_ID_IDX" tableName="OIDCUSERS_PROJECTS_ROLES">
             <column name="PROJECT_ACCESS_ROLE_ID" />
         </createIndex>
+
     </changeSet>
 </databaseChangeLog>
