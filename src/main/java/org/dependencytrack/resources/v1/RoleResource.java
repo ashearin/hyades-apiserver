@@ -27,6 +27,8 @@ import alpine.server.resources.AlpineResource;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -39,6 +41,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -85,12 +88,10 @@ public class RoleResource extends AlpineResource {
     })
     @PermissionRequired({Permissions.Constants.ACCESS_MANAGEMENT, Permissions.Constants.ACCESS_MANAGEMENT_READ})
     public Response getRoles() {
-        try (QueryManager qm = new QueryManager(getAlpineRequest())) {
-            final long totalCount = qm.getCount(Role.class);
-            final List<Role> roles = qm.getRoles();
+            LOGGER.info("Creating role %s".formatted(jsonRole.toString()));
             return Response.ok(roles).header(TOTAL_COUNT_HEADER, totalCount).build();
         }
-    }
+
 
     @GET
     @Path("/{uuid}")
@@ -112,6 +113,7 @@ public class RoleResource extends AlpineResource {
     public Response getRole(
             @Parameter(description = "The UUID of the role to retrieve", schema = @Schema(type = "string", format = "uuid"), required = true)
             @PathParam("uuid") @ValidUuid String uuid) {
+                LOGGER.info("Creating role %s".formatted(jsonRole.toString()));
                 return Response.ok(role).build();
     }
 
@@ -132,6 +134,7 @@ public class RoleResource extends AlpineResource {
     })
     @PermissionRequired({Permissions.Constants.ACCESS_MANAGEMENT, Permissions.Constants.ACCESS_MANAGEMENT_CREATE})
     public Response createRole(Role jsonRole) {
+        LOGGER.info("Creating role %s".formatted(jsonRole.toString()));
         return Response.ok(role).build();
     }
 
@@ -153,6 +156,7 @@ public class RoleResource extends AlpineResource {
     })
     @PermissionRequired({Permissions.Constants.ACCESS_MANAGEMENT, Permissions.Constants.ACCESS_MANAGEMENT_UPDATE})
     public Response updateRole(Role jsonRole) {
+        LOGGER.info("Creating role %s".formatted(jsonRole.toString()));
         return Response.ok(role).build();
     }
 
@@ -170,6 +174,7 @@ public class RoleResource extends AlpineResource {
     })
     @PermissionRequired({Permissions.Constants.ACCESS_MANAGEMENT, Permissions.Constants.ACCESS_MANAGEMENT_DELETE})
     public Response deleteRole(Role jsonRole) {
+        LOGGER.info("Creating role %s".formatted(jsonRole.toString()));
         return Response.ok(role).build();
     }
 
