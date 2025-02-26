@@ -809,22 +809,22 @@ public class UserResource extends AlpineResource {
         @QueryParam("projectName") String projectName) {
         try (QueryManager qm = new QueryManager()) {
             final Role role = qm.getObjectByUuid(Role.class, identifiableObject.getUuid());
-            if (role == null) {
+            if (role == null)
                 return Response.status(Response.Status.NOT_FOUND).entity("The role could not be found.").build();
-            }
+
             UserPrincipal principal = qm.getUserPrincipal(username);
-            if (principal == null) {
+            if (principal == null)
                 return Response.status(Response.Status.NOT_FOUND).entity("The user could not be found.").build();
-            }
-            //Need to add "addRoleToUser" to AplineQueryManager.java
+
+            //Need to add "addRoleToUser" to QueryManager.java
             final boolean modified = qm.addRoleToUser(principal, role, roleName, projectName);
             principal = qm.getObjectById(principal.getClass(), principal.getId());
             if (modified) {
-                super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Added role membership for: " + principal.getName() + " / role: " + role.getName() + " / project: " + projectName);
+                super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Added role membership for: %s / role: %s / project: %s".formatted(principal.getName(), role.getName(), projectName));
                 return Response.ok(principal).build();
-            } else {
-                return Response.status(Response.Status.NOT_MODIFIED).entity("The user is already a member of the specified role.").build();
             }
+
+            return Response.status(Response.Status.NOT_MODIFIED).entity("The user is already a member of the specified role.").build();
         }
     }
     @DELETE
@@ -856,24 +856,25 @@ public class UserResource extends AlpineResource {
         @QueryParam("roleName") String roleName,
         @Parameter(description = "The name of the project", required = true)
         @QueryParam("projectName") String projectName) {
-    try (QueryManager qm = new QueryManager()) {
-        final Role role = qm.getObjectByUuid(Role.class, identifiableObject.getUuid());
-        if (role == null) {
-            return Response.status(Response.Status.NOT_FOUND).entity("The role could not be found.").build();
-        }
-        UserPrincipal principal = qm.getUserPrincipal(username);
-        if (principal == null) {
-            return Response.status(Response.Status.NOT_FOUND).entity("The user could not be found.").build();
-        }
-        // Need to add "removeRoleFromUser" to AlpineQueryManager.java
-        final boolean modified = qm.removeRoleFromUser(principal, role, roleName, projectName);
-        principal = qm.getObjectById(principal.getClass(), principal.getId());
-        if (modified) {
-            super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Removed role membership for: " + principal.getName() + " / role: " + role.getName() + " / project: " + projectName);
-            return Response.noContent().build();
-        } else {
+        try (QueryManager qm = new QueryManager()) {
+            final Role role = qm.getObjectByUuid(Role.class, identifiableObject.getUuid());
+            if (role == null)
+                return Response.status(Response.Status.NOT_FOUND).entity("The role could not be found.").build();
+
+            UserPrincipal principal = qm.getUserPrincipal(username);
+            if (principal == null)
+                return Response.status(Response.Status.NOT_FOUND).entity("The user could not be found.").build();
+
+            // Need to add "removeRoleFromUser" to QueryManager.java
+            final boolean modified = qm.removeRoleFromUser(principal, role, roleName, projectName);
+
+            principal = qm.getObjectById(principal.getClass(), principal.getId());
+            if (modified) {
+                super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Removed role membership for: %s / role: %s / project: %s".formatted(principal.getName(), role.getName(), projectName));
+                return Response.noContent().build();
+            }
+
             return Response.status(Response.Status.NOT_MODIFIED).entity("The user is not a member of the specified role.").build();
         }
     }
-}
 }
