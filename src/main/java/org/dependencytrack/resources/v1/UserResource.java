@@ -799,14 +799,14 @@ public class UserResource extends AlpineResource {
     })
     @PermissionRequired({Permissions.Constants.ACCESS_MANAGEMENT, Permissions.Constants.ACCESS_MANAGEMENT_UPDATE})
     public Response addRoleToUser(
-        @Parameter(description = "A valid username", required = true)
-        @PathParam("username") String username,
-        @Parameter(description = "The UUID of the role to associate username with", required = true)
+            @Parameter(description = "A valid username", required = true)
+            @PathParam("username") String username,
+            @Parameter(description = "The UUID of the role to associate username with", required = true)
         IdentifiableObject identifiableObject,
-        @Parameter(description = "The name of the role", required = true)
-        @QueryParam("roleName") String roleName,
-        @Parameter(description = "The name of the project", required = true)
-        @QueryParam("projectName") String projectName) {
+            @Parameter(description = "The name of the role", required = true)
+            @QueryParam("roleName") String roleName,
+            @Parameter(description = "The name of the project", required = true)
+            @QueryParam("projectName") String projectName) {
         try (QueryManager qm = new QueryManager()) {
             final Role role = qm.getObjectByUuid(Role.class, identifiableObject.getUuid());
             if (role == null)
@@ -816,7 +816,6 @@ public class UserResource extends AlpineResource {
             if (principal == null)
                 return Response.status(Response.Status.NOT_FOUND).entity("The user could not be found.").build();
 
-            //Need to add "addRoleToUser" to QueryManager.java
             final boolean modified = qm.addRoleToUser(principal, role, roleName, projectName);
             principal = qm.getObjectById(principal.getClass(), principal.getId());
             if (modified) {
@@ -827,35 +826,36 @@ public class UserResource extends AlpineResource {
             return Response.status(Response.Status.NOT_MODIFIED).entity("The user is already a member of the specified role.").build();
         }
     }
+
     @DELETE
     @Path("/{username}/role")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(
-        summary = "Removes role from specific user.",
-        description = "<p>Requires permission <strong>ACCESS_MANAGEMENT</strong> or <strong>ACCESS_MANAGEMENT_UPDATE</strong></p>"
+            summary = "Removes role from specific user.",
+            description = "<p>Requires permission <strong>ACCESS_MANAGEMENT</strong> or <strong>ACCESS_MANAGEMENT_UPDATE</strong></p>"
 )
     @ApiResponses(value = {
-        @ApiResponse(
-                responseCode = "200",
-                description = "Updated user with a specific role removed",
-                content = @Content(schema = @Schema(implementation = UserPrincipal.class))
-        ),
-        @ApiResponse(responseCode = "204", description = "The role has been successfully removed from the user"),
-        @ApiResponse(responseCode = "304", description = "The user is not a member of the specified role"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized"),
-        @ApiResponse(responseCode = "404", description = "The user or role could not be found")
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Updated user with a specific role removed",
+                    content = @Content(schema = @Schema(implementation = UserPrincipal.class))
+            ),
+            @ApiResponse(responseCode = "204", description = "The role has been successfully removed from the user"),
+            @ApiResponse(responseCode = "304", description = "The user is not a member of the specified role"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "The user or role could not be found")
 })
     @PermissionRequired({Permissions.Constants.ACCESS_MANAGEMENT, Permissions.Constants.ACCESS_MANAGEMENT_UPDATE})
     public Response removeRoleFromUser(
-        @Parameter(description = "A valid username", required = true)
-        @PathParam("username") String username,
-        @Parameter(description = "The UUID of the role to remove from the username", required = true)
+            @Parameter(description = "A valid username", required = true)
+            @PathParam("username") String username,
+            @Parameter(description = "The UUID of the role to remove from the username", required = true)
         IdentifiableObject identifiableObject,
-        @Parameter(description = "The name of the role", required = true)
-        @QueryParam("roleName") String roleName,
-        @Parameter(description = "The name of the project", required = true)
-        @QueryParam("projectName") String projectName) {
+            @Parameter(description = "The name of the role", required = true)
+            @QueryParam("roleName") String roleName,
+            @Parameter(description = "The name of the project", required = true)
+            @QueryParam("projectName") String projectName) {
         try (QueryManager qm = new QueryManager()) {
             final Role role = qm.getObjectByUuid(Role.class, identifiableObject.getUuid());
             if (role == null)
@@ -865,7 +865,6 @@ public class UserResource extends AlpineResource {
             if (principal == null)
                 return Response.status(Response.Status.NOT_FOUND).entity("The user could not be found.").build();
 
-            // Need to add "removeRoleFromUser" to QueryManager.java
             final boolean modified = qm.removeRoleFromUser(principal, role, roleName, projectName);
 
             principal = qm.getObjectById(principal.getClass(), principal.getId());

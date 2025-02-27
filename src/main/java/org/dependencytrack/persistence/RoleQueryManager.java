@@ -6,7 +6,6 @@ import java.util.List;
 
 import javax.jdo.PersistenceManager;
 
-import org.checkerframework.checker.units.qual.A;
 import org.dependencytrack.model.Role;
 
 import alpine.common.logging.Logger;
@@ -25,17 +24,17 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
     }
 
     public Role createRole(Role role) {
-    // TODO:Implement role creation logic
+        // TODO:Implement role creation logic
         return role;
     }
 
     public List<Role> getRoles() {
-    // TODO:Implement role retrieval logic
+        // TODO:Implement role retrieval logic
         return Collections.emptyList();
     }
 
     public Role getRole(String uuid) {
-    // TODO:Implement role retrieval logic
+        // TODO:Implement role retrieval logic
         return null;
     }
 
