@@ -61,6 +61,7 @@ import javax.jdo.annotations.Unique;
         @Persistent(name = "name"),
         @Persistent(name = "description"),
         @Persistent(name = "permissions"),
+        @Persistent(name = "uuid"),
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Role implements Serializable {
