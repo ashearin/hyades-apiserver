@@ -49,7 +49,11 @@ import org.dependencytrack.auth.Permissions;
 import org.dependencytrack.model.validation.ValidUuid;
 import org.dependencytrack.model.Role;
 import org.dependencytrack.persistence.QueryManager;
+import org.dependencytrack.persistence.jdbi.RoleDao;
+import org.jdbi.v3.core.Handle;
 import org.owasp.security.logging.SecurityMarkers;
+
+import static org.dependencytrack.persistence.jdbi.JdbiFactory.openJdbiHandle;
 
 /**
  * JAX-RS resources for processing roles.
@@ -67,79 +71,108 @@ public class RoleResource extends AlpineResource {
 
     private static final Logger LOGGER = Logger.getLogger(RoleResource.class);
 
-    @GET
+    @PUT
+    @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(
-            summary = "Returns a list of all roles",
-            description = "<p>Requires permission <strong>ROLE_MANAGEMENT</strong> or <strong>ROLE_MANAGEMENT_READ</strong></p>"
-    )
+            summary = "Creates a new role",
+            description = "<p>Requires permission <strong>ROLE_MANAGEMENT</strong> or <strong>ROLE_MANAGEMENT_CREATE</strong></p>")
     @ApiResponses(value = {
             @ApiResponse(
-                    responseCode = "200",
-                    description = "A list of all roles",
-                    headers = @Header(name = TOTAL_COUNT_HEADER, description = "The total number of roles", schema = @Schema(format = "integer")),
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = Role.class)))
-            ),
+                    responseCode = "201",
+                    description = "The created role",
+                    content = @Content(schema = @Schema(implementation = Role.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
-    @PermissionRequired({ Permissions.Constants.ROLE_MANAGEMENT, Permissions.Constants.ROLE_MANAGEMENT_READ })
-    public Response getRoles() {
+    @PermissionRequired({ Permissions.Constants.ROLE_MANAGEMENT, Permissions.Constants.ROLE_MANAGEMENT_CREATE })
+    public Response createRole(Role jsonRole) {
+        failOnValidationError(super.getValidator().validateProperty(jsonRole, "name"));
+
         try (QueryManager qm = new QueryManager()) {
-            return Response.ok(qm.getRoles()).header(TOTAL_COUNT_HEADER, 0).build();
+            final Role role = qm.createRole(jsonRole.getName(), jsonRole.getDescription(), jsonRole.getPermissions());
+            super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Role created: " + role.getName());
+
+            return Response.status(Response.Status.CREATED).entity(role).build();
         }
     }
- 
+
+    @DELETE
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(
+            summary = "Deletes a role",
+            description = "<p>Requires permission <strong>ROLE_MANAGEMENT</strong> or <strong>ROLE_MANAGEMENT_DELETE</strong></p>")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Role removed successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "The role could not be found")
+    })
+    @PermissionRequired({ Permissions.Constants.ROLE_MANAGEMENT, Permissions.Constants.ROLE_MANAGEMENT_DELETE })
+    public Response deleteRole(Role jsonRole) {
+        try (QueryManager qm = new QueryManager()) {
+            final Role role = qm.getObjectByUuid(Role.class, jsonRole.getUuid(), Role.FetchGroup.ALL.name());
+            if (role == null)
+                return Response.status(Response.Status.NOT_FOUND).entity("The role could not be found.").build();
+
+            try (final Handle jdbiHandle = openJdbiHandle()) {
+                jdbiHandle.attach(RoleDao.class).deleteRole(role.getId());
+            }
+
+            super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Role deleted: " + role.getName());
+
+            return Response.noContent().build();
+        }
+    }
 
     @GET
     @Path("/{uuid}")
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(
             summary = "Returns a specific role",
-            description = "<p>Requires permission <strong>ROLE_MANAGEMENT</strong> or <strong>ROLE_MANAGEMENT_READ</strong></p>"
-    )
+            description = "<p>Requires permission <strong>ROLE_MANAGEMENT</strong> or <strong>ROLE_MANAGEMENT_READ</strong></p>")
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
                     description = "A specific role",
-                    content = @Content(schema = @Schema(implementation = Role.class))
-            ),
+                    content = @Content(schema = @Schema(implementation = Role.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),
             @ApiResponse(responseCode = "404", description = "The role could not be found")
     })
     @PermissionRequired({ Permissions.Constants.ROLE_MANAGEMENT, Permissions.Constants.ROLE_MANAGEMENT_READ })
     public Response getRole(
-            @Parameter(description = "The UUID of the role to retrieve", schema = @Schema(type = "string", format = "uuid"), required = true) @PathParam("uuid") @ValidUuid String uuid) {
+            @Parameter(
+                    description = "The UUID of the role to retrieve",
+                    schema = @Schema(type = "string", format = "uuid"),
+                    required = true) @PathParam("uuid") @ValidUuid String uuid) {
         try (QueryManager qm = new QueryManager()) {
             Role role = qm.getObjectByUuid(Role.class, uuid);
             if (role == null)
-                return Response.status(Response.Status.NOT_FOUND).entity("The team could not be found.").build();
+                return Response.status(Response.Status.NOT_FOUND).entity("The role could not be found.").build();
 
-            super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT,
-                    "Returned role: " + role.getName());
             return Response.ok(role).build();
         }
     }
 
-    @PUT
-    @Consumes(MediaType.APPLICATION_JSON)
+    @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(
-            summary = "Creates a new role",
-            description = "<p>Requires permission <strong>ROLE_MANAGEMENT</strong> or <strong>ROLE_MANAGEMENT_CREATE</strong></p>"
-    )
+            summary = "Returns a list of all roles",
+            description = "<p>Requires permission <strong>ROLE_MANAGEMENT</strong> or <strong>ROLE_MANAGEMENT_READ</strong></p>")
     @ApiResponses(value = {
             @ApiResponse(
-                    responseCode = "201",
-                    description = "The created role",
-                    content = @Content(schema = @Schema(implementation = Role.class))
-            ),
+                    responseCode = "200",
+                    description = "A list of all roles",
+                    headers = @Header(
+                            name = TOTAL_COUNT_HEADER,
+                            description = "The total number of roles",
+                            schema = @Schema(format = "integer")),
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = Role.class)))),
             @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
-    @PermissionRequired({ Permissions.Constants.ROLE_MANAGEMENT, Permissions.Constants.ROLE_MANAGEMENT_CREATE })
-    public Response createRole(Role jsonRole) {
-        super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Created role: " + jsonRole.getName());
+    @PermissionRequired({ Permissions.Constants.ROLE_MANAGEMENT, Permissions.Constants.ROLE_MANAGEMENT_READ })
+    public Response getRoles() {
         try (QueryManager qm = new QueryManager()) {
-            return Response.ok(qm.persist(jsonRole)).build();
+            return Response.ok(qm.getRoles()).header(TOTAL_COUNT_HEADER, qm.getCount(Role.class)).build();
         }
     }
 
@@ -148,39 +181,28 @@ public class RoleResource extends AlpineResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(
             summary = "Updates a role's fields",
-            description = "<p>Requires permission <strong>ROLE_MANAGEMENT</strong> or <strong>ROLE_MANAGEMENT_UPDATE</strong></p>"
-    )
+            description = "<p>Requires permission <strong>ROLE_MANAGEMENT</strong> or <strong>ROLE_MANAGEMENT_UPDATE</strong></p>")
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
                     description = "The updated role",
-                    content = @Content(schema = @Schema(implementation = Role.class))
-            ),
+                    content = @Content(schema = @Schema(implementation = Role.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),
             @ApiResponse(responseCode = "404", description = "The role could not be found")
     })
     @PermissionRequired({ Permissions.Constants.ROLE_MANAGEMENT, Permissions.Constants.ROLE_MANAGEMENT_UPDATE })
     public Response updateRole(Role jsonRole) {
-        super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Updated role: " + jsonRole.getName());
-        return Response.ok(jsonRole).build();
-    }
+        failOnValidationError(super.getValidator().validateProperty(jsonRole, "name"));
 
-    @DELETE
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    @Operation(
-            summary = "Deletes a role",
-            description = "<p>Requires permission <strong>ROLE_MANAGEMENT</strong> or <strong>ROLE_MANAGEMENT_DELETE</strong></p>"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Role removed successfully"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "404", description = "The role could not be found")
-    })
-    @PermissionRequired({ Permissions.Constants.ROLE_MANAGEMENT, Permissions.Constants.ROLE_MANAGEMENT_DELETE })
-    public Response deleteRole(Role jsonRole) {
-        super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Delete role: " + jsonRole.getName());
-        return Response.ok(jsonRole).build();
+        try (QueryManager qm = new QueryManager()) {
+            Role role = qm.updateRole(jsonRole);
+            if (role == null)
+                return Response.status(Response.Status.NOT_FOUND).entity("The role could not be found.").build();
+
+            super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Role updated: " + role.getName());
+
+            return Response.ok(role).build();
+        }
     }
 
 }

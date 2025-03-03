@@ -18,11 +18,13 @@
  */
 package org.dependencytrack.persistence;
 
+import java.util.Collections;
 import java.util.List;
 
 import javax.jdo.PersistenceManager;
 import javax.jdo.Query;
 
+import org.dependencytrack.model.Project;
 import org.dependencytrack.model.Role;
 
 import alpine.common.logging.Logger;
@@ -32,7 +34,7 @@ import alpine.resources.AlpineRequest;
 
 final class RoleQueryManager extends QueryManager implements IQueryManager {
 
-    private static final Logger LOGGER = Logger.getLogger(ProjectQueryManager.class);
+    private static final Logger LOGGER = Logger.getLogger(RoleQueryManager.class);
 
     RoleQueryManager(final PersistenceManager pm) {
         super(pm);
@@ -40,6 +42,12 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
 
     RoleQueryManager(final PersistenceManager pm, final AlpineRequest request) {
         super(pm, request);
+    }
+
+    @Override
+    public boolean addRoleToUser(UserPrincipal user, Role role, Project project) {
+        // TODO: Implement addRoleToUser
+        return true;
     }
 
     @Override
@@ -53,6 +61,13 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
     }
 
     @Override
+    public Role getRole(String uuid) {
+        final Query<Role> query = pm.newQuery(Role.class, "uuid == :uuid");
+
+        return query.executeUnique();
+    }
+
+    @Override
     public List<Role> getRoles() {
         final Query<Role> query = pm.newQuery(Role.class);
         if (orderBy == null)
@@ -61,35 +76,36 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
         return query.executeList();
     }
 
-    @Override
-    public Role getRole(String uuid) {
-        // TODO:Implement role retrieval logic
-        return null;
+    public List<Project> getUnassignedProjects(final String username) {
+        return getUnassignedProjects(getUserPrincipal(username));
+    }
+
+    public List<Project> getUnassignedProjects(final UserPrincipal principal) {
+        // TODO: Implement getUnassignedProjects
+        return Collections.emptyList();
+    }
+
+    public List<Permission> getUnassignedRolePermissions(final Role role) {
+        // TODO: Implement getUnassignedRolePermissions
+        return Collections.emptyList();
     }
 
     @Override
-    public Role updateRole(Role role) {
-        // TODO:Implement role update logic
-        return role;
-    }
-
-    @Override
-    public boolean deleteRole(String uuid, boolean value) {
-        // TODO:Implement role deletion logic
-        return false;
-    }
-
-    @Override
-    public boolean addRoleToUser(UserPrincipal principal, Role role, String roleName, String projectName) {
-        // WARNING: This method is a stub.
-        // TODO: Implement addRoleToUser
-        return true;
-    }
-
-    @Override
-    public boolean removeRoleFromUser(UserPrincipal principal, Role role, String roleName, String projectName) {
-        // WARNING: This method is a stub.
+    public boolean removeRoleFromUser(UserPrincipal principal, Role role, Project project) {
         // TODO: Implement removeRoleFromUser
         return true;
     }
+
+    @Override
+    public Role updateRole(Role transientRole) {
+        final Role role = getObjectByUuid(Role.class, transientRole.getUuid());
+        if (role == null)
+            return null;
+
+        role.setName(transientRole.getName());
+        role.setDescription(transientRole.getDescription());
+
+        return persist(role);
+    }
+
 }
