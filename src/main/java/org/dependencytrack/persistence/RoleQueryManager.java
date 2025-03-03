@@ -45,12 +45,6 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
     }
 
     @Override
-    public boolean addRoleToUser(UserPrincipal user, Role role, Project project) {
-        // TODO: Implement addRoleToUser
-        return true;
-    }
-
-    @Override
     public Role createRole(final String name, final String description, final List<Permission> permissions) {
         Role role = new Role();
         role.setName(name);
@@ -61,19 +55,19 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
     }
 
     @Override
-    public Role getRole(String uuid) {
-        final Query<Role> query = pm.newQuery(Role.class, "uuid == :uuid");
-
-        return query.executeUnique();
-    }
-
-    @Override
     public List<Role> getRoles() {
         final Query<Role> query = pm.newQuery(Role.class);
         if (orderBy == null)
             query.setOrdering("name asc");
 
         return query.executeList();
+    }
+
+    @Override
+    public Role getRole(String uuid) {
+        final Query<Role> query = pm.newQuery(Role.class, "uuid == :uuid");
+
+        return query.executeUnique();
     }
 
     public List<Project> getUnassignedProjects(final String username) {
@@ -91,12 +85,6 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
     }
 
     @Override
-    public boolean removeRoleFromUser(UserPrincipal principal, Role role, Project project) {
-        // TODO: Implement removeRoleFromUser
-        return true;
-    }
-
-    @Override
     public Role updateRole(Role transientRole) {
         final Role role = getObjectByUuid(Role.class, transientRole.getUuid());
         if (role == null)
@@ -106,6 +94,18 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
         role.setDescription(transientRole.getDescription());
 
         return persist(role);
+    }
+
+    @Override
+    public boolean addRoleToUser(UserPrincipal user, Role role, Project project) {
+        // TODO: Implement addRoleToUser
+        return true;
+    }
+
+    @Override
+    public boolean removeRoleFromUser(UserPrincipal principal, Role role, Project project) {
+        // TODO: Implement removeRoleFromUser
+        return true;
     }
 
 }
