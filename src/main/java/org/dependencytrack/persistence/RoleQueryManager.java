@@ -37,4 +37,51 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
         //TODO: Implement removeRoleFromUser
         return true;
     }
+
+    public List<Role> getRoles() {
+        final Query<Role> query = pm.newQuery(Role.class);
+        if (orderBy == null)
+            query.setOrdering("name asc");
+
+        return query.executeList();
+    }
+
+    public List<Permission> getUserProjectPermissions(final String userName, final String projectName) {
+            final Map.Entry<String, Map<String, Object>> projectAclConditionAndParams = getProjectAclSqlCondition();
+            final String projectAclCondition = projectAclConditionAndParams.getKey();
+            final Map<String, Object> projectAclConditionParams = projectAclConditionAndParams.getValue();
+    
+            // language=SQL
+            var sqlQuery = """
+                    SELECT
+                        "PERMISSION"."NAME",
+                        "PERMISSION"."DESCRIPTION"
+                    FROM "PERMISSION"
+                    INNER JOIN "ROLES_PERMISSIONS"
+                        ON "PERMISSION"."ID" = "ROLES_PERMISSIONS"."PERMISSION_ID"
+                    INNER JOIN "ROLE"
+                        ON "ROLE"."ID" = "ROLES_PERMISSIONS"."ROLE_ID"
+                    INNER JOIN "PROJECT_ACCESS_ROLES"
+                    
+                        ON "PROJECT_ACCESS_ROLES"."ROLE_ID" = "ROLE"."ID"
+                    INNER JOIN "PROJECT"
+                        ON "PROJECT"."ID" = "PROJECT_ACCESS_ROLES"."PROJECT_ID"
+                    INNER JOIN "MANAGEDUSERS_PROJECTS_ROLES"
+                        ON "MANAGEDUSERS_PROJECTS_ROLES"."PROJECT_ACCESS_ROLE_ID" = "PROJECT_ACCESS_ROLES"."ID"
+                    INNER JOIN "MANAGEDUSER"
+                        ON "MANAGEDUSER"."ID" = "MANAGEDUSERS_PROJECTS_ROLES"."MANAGEDUSER_ID"
+                    WHERE
+                        "MANAGEDUSER"."USERNAME" = :userName AND
+                        "PROJECT"."NAME" = :projectName
+                    """.formatted(projectAclCondition);
+    
+            final var params = new HashMap<>(projectAclConditionParams);
+    
+    
+            sqlQuery += " " + getOffsetLimitSqlClause();
+    
+            final Query<?> query = pm.newQuery(Query.SQL, sqlQuery);
+            query.setNamedParameters(params);
+            return executeAndCloseResultList(query, Permission.class);
+        }
 }

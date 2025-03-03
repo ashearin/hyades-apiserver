@@ -1341,6 +1341,10 @@ public class QueryManager extends AlpineQueryManager {
         return getRoleQueryManager().removeRoleFromUser(principal, role, roleName, projectName);
     }
 
+    public List<Permission> getUserProjectPermissions(final String userName, final String projectName){
+        return getRoleQueryManager().getUserProjectPermissions(userName, projectName);
+    }
+
     public NotificationRule createNotificationRule(String name, NotificationScope scope, NotificationLevel level, NotificationPublisher publisher) {
         return getNotificationQueryManager().createNotificationRule(name, scope, level, publisher);
     }
@@ -2108,5 +2112,14 @@ public class QueryManager extends AlpineQueryManager {
         }
 
         return clauseTemplate.formatted(pagination.getOffset(), pagination.getLimit());
+    }
+
+    public Role createRole(final String name, final String description, final List<Permission> permissions) {
+        Role role = new Role();
+        role.setName(name);
+        role.setDescription(description);
+        role.setPermissions(permissions);
+
+        return persist(role);
     }
 }

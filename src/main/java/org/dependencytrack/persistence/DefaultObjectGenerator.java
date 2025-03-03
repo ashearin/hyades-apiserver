@@ -31,6 +31,8 @@ import org.dependencytrack.auth.Permissions;
 import org.dependencytrack.common.ConfigKey;
 import org.dependencytrack.model.ConfigPropertyConstants;
 import org.dependencytrack.model.License;
+import org.dependencytrack.model.MappedRole;
+import org.dependencytrack.model.Project;
 import org.dependencytrack.model.RepositoryType;
 import org.dependencytrack.parser.spdx.json.SpdxLicenseDetailParser;
 import org.dependencytrack.persistence.defaults.DefaultLicenseGroupImporter;
@@ -224,7 +226,7 @@ public class DefaultObjectGenerator implements ServletContextListener {
             LOGGER.info("Adding default users and teams to datastore");
             LOGGER.debug("Creating user: admin");
             ManagedUser admin = qm.createManagedUser("admin", "Administrator", "admin@localhost",
-                    new String(PasswordService.createHash("admin".toCharArray())), true, true, false);
+                    new String(PasswordService.createHash("admin".toCharArray())), false, true, false);
 
             LOGGER.debug("Creating team: Administrators");
             final Team sysadmins = qm.createTeam("Administrators", false);
@@ -254,6 +256,26 @@ public class DefaultObjectGenerator implements ServletContextListener {
             admin = qm.getObjectById(ManagedUser.class, admin.getId());
             admin.setPermissions(qm.getPermissions());
             qm.persist(admin);
+
+              var project = new Project();
+            project.setName("test-project");
+            project.setDescription("Project for testing role schemas");
+            project.setVersion("v0.1.0");
+
+            qm.persist(project);
+
+            Permission viewPermission = qm.getPermission(Permissions.Constants.VIEW_PORTFOLIO);
+
+            var mappedRole = new MappedRole();
+            mappedRole.setProject(project);
+
+            for (String roleName : new String[]{"GitLab Guest", "GitLab Planner", "GitLab Reporter", "GitLab Developer", "GitLab Maintainer", "GitLab Owner"}) {
+                mappedRole.setRole(qm.createRole(roleName, null, List.of(viewPermission)));
+            }
+
+            mappedRole.addManagedUsers(admin);
+
+            qm.persist(mappedRole);
         }
     }
 
