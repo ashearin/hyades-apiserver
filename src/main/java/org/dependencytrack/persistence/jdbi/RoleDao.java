@@ -26,7 +26,7 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  */
 public interface RoleDao {
 
-    @SqlUpdate("""
+    @SqlUpdate(/* language=sql */ """
             DELETE
               FROM "ROLE"
              WHERE "ID" = :roleId
