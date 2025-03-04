@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 
 import javax.jdo.PersistenceManager;
 import javax.jdo.Query;
@@ -30,6 +29,8 @@ import javax.jdo.Query;
 import org.dependencytrack.model.MappedRole;
 import org.dependencytrack.model.Project;
 import org.dependencytrack.model.Role;
+import org.dependencytrack.persistence.jdbi.RoleDao;
+import org.jdbi.v3.core.Handle;
 
 import alpine.common.logging.Logger;
 import alpine.model.LdapUser;
@@ -38,6 +39,8 @@ import alpine.model.OidcUser;
 import alpine.model.Permission;
 import alpine.model.UserPrincipal;
 import alpine.resources.AlpineRequest;
+
+import static org.dependencytrack.persistence.jdbi.JdbiFactory.openJdbiHandle;
 
 final class RoleQueryManager extends QueryManager implements IQueryManager {
 
@@ -157,55 +160,18 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
 
     @Override
     public boolean removeRoleFromUser(UserPrincipal user, Role role, Project project) {
-        String userTable;
-        Supplier<List<? extends UserPrincipal>> userList;
+        try (final Handle jdbiHandle = openJdbiHandle()) {
+            int count = switch (user) {
+                case LdapUser ldapUser -> jdbiHandle.attach(RoleDao.class)
+                        .removeRoleFromLdapUser(ldapUser.getId(), project.getId(), role.getId());
+                case ManagedUser managedUser -> jdbiHandle.attach(RoleDao.class)
+                        .removeRoleFromManagedUser(managedUser.getId(), project.getId(), role.getId());
+                case OidcUser oidcUser -> jdbiHandle.attach(RoleDao.class)
+                        .removeRoleFromOidcUser(oidcUser.getId(), project.getId(), role.getId());
+                default -> 0;
+            };
 
-        final MappedRole mappedRole = new MappedRole();
-
-        switch (user) {
-            case LdapUser ldapUser -> {
-                userTable = "ldapUsers";
-                userList = mappedRole::getLdapUsers;
-            }
-            case ManagedUser managedUser -> {
-                userTable = "managedUsers";
-                userList = mappedRole::getManagedUsers;
-            }
-            case OidcUser oidcUser -> {
-                userTable = "oidcUsers";
-                userList = mappedRole::getOidcUsers;
-            }
-            default -> {
-                return false;
-            }
-        };
-
-        Query<MappedRole> query = pm.newQuery(MappedRole.class)
-                .filter("project.id == :projectId && role.id == :roleId && %s.contains(:user)".formatted(userTable))
-                .setNamedParameters(Map.of(
-                        "projectId", project.getId(),
-                        "roleId", role.getId(),
-                        "user", user));
-
-        try {
-            var result = query.executeUnique();
-
-            if (result == null)
-                return false;
-
-            mappedRole.setProject(result.getProject());
-            mappedRole.setRole(result.getRole());
-            mappedRole.setLdapUsers(result.getLdapUsers() != null ? result.getLdapUsers() : new ArrayList<>());
-            mappedRole.setManagedUsers(result.getManagedUsers() != null ? result.getManagedUsers() : new ArrayList<>());
-            mappedRole.setOidcUsers(result.getOidcUsers() != null ? result.getOidcUsers() : new ArrayList<>());
-
-            boolean modified = userList.get().remove(user);
-            if (modified)
-                persist(userList.get());
-
-            return modified;
-        } finally {
-            query.closeAll();
+            return count == 1;
         }
 
     }
