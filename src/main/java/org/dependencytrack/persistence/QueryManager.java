@@ -1352,6 +1352,10 @@ public class QueryManager extends AlpineQueryManager {
         return getRoleQueryManager().removeRoleFromUser(principal, role, project);
     }
 
+    public List<Permission> getUserProjectPermissions(final String userName, final String projectName){
+        return getRoleQueryManager().getUserProjectPermissions(userName, projectName);
+    }
+
     public NotificationRule createNotificationRule(String name, NotificationScope scope, NotificationLevel level, NotificationPublisher publisher) {
         return getNotificationQueryManager().createNotificationRule(name, scope, level, publisher);
     }

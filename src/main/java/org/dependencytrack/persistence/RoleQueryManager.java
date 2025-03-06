@@ -20,6 +20,7 @@ package org.dependencytrack.persistence;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -132,19 +133,19 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
             final MappedRole mappedRole = result;
 
             boolean modified = switch (user) {
-                case LdapUser ldapUser when !mappedRole.getLdapUsers().contains(ldapUser) -> {
-                    mappedRole.addLdapUsers(ldapUser);
-                    yield true;
-                }
-                case ManagedUser managedUser when !mappedRole.getManagedUsers().contains(managedUser) -> {
-                    mappedRole.addManagedUsers(managedUser);
-                    yield true;
-                }
-                case OidcUser oidcUser when !mappedRole.getOidcUsers().contains(oidcUser) -> {
-                    mappedRole.addOidcUsers(oidcUser);
-                    yield true;
-                }
-                default -> false;
+            case LdapUser ldapUser when !mappedRole.getLdapUsers().contains(ldapUser) -> {
+                mappedRole.addLdapUsers(ldapUser);
+                yield true;
+            }
+            case ManagedUser managedUser when !mappedRole.getManagedUsers().contains(managedUser) -> {
+                mappedRole.addManagedUsers(managedUser);
+                yield true;
+            }
+            case OidcUser oidcUser when !mappedRole.getOidcUsers().contains(oidcUser) -> {
+                mappedRole.addOidcUsers(oidcUser);
+                yield true;
+            }
+            default -> false;
             };
 
             if (modified)
@@ -160,18 +161,54 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
     public boolean removeRoleFromUser(UserPrincipal user, Role role, Project project) {
         try (final Handle jdbiHandle = openJdbiHandle()) {
             int count = switch (user) {
-                case LdapUser ldapUser -> jdbiHandle.attach(RoleDao.class)
-                        .removeRoleFromLdapUser(ldapUser.getId(), project.getId(), role.getId());
-                case ManagedUser managedUser -> jdbiHandle.attach(RoleDao.class)
-                        .removeRoleFromManagedUser(managedUser.getId(), project.getId(), role.getId());
-                case OidcUser oidcUser -> jdbiHandle.attach(RoleDao.class)
-                        .removeRoleFromOidcUser(oidcUser.getId(), project.getId(), role.getId());
-                default -> 0;
+            case LdapUser ldapUser -> jdbiHandle.attach(RoleDao.class)
+                    .removeRoleFromLdapUser(ldapUser.getId(), project.getId(), role.getId());
+            case ManagedUser managedUser -> jdbiHandle.attach(RoleDao.class)
+                    .removeRoleFromManagedUser(managedUser.getId(), project.getId(), role.getId());
+            case OidcUser oidcUser -> jdbiHandle.attach(RoleDao.class)
+                    .removeRoleFromOidcUser(oidcUser.getId(), project.getId(), role.getId());
+            default -> 0;
             };
 
             return count == 1;
         }
-
     }
 
+    public List<Permission> getUserProjectPermissions(final String userName, final String projectName) {
+        final Map.Entry<String, Map<String, Object>> projectAclConditionAndParams = getProjectAclSqlCondition();
+        final String projectAclCondition = projectAclConditionAndParams.getKey();
+        final Map<String, Object> projectAclConditionParams = projectAclConditionAndParams.getValue();
+
+        // language=SQL
+        var sqlQuery = """
+                SELECT
+                    "PERMISSION"."NAME",
+                    "PERMISSION"."DESCRIPTION"
+                FROM "PERMISSION"
+                INNER JOIN "ROLES_PERMISSIONS"
+                    ON "PERMISSION"."ID" = "ROLES_PERMISSIONS"."PERMISSION_ID"
+                INNER JOIN "ROLE"
+                    ON "ROLE"."ID" = "ROLES_PERMISSIONS"."ROLE_ID"
+                INNER JOIN "PROJECT_ACCESS_ROLES"
+
+                    ON "PROJECT_ACCESS_ROLES"."ROLE_ID" = "ROLE"."ID"
+                INNER JOIN "PROJECT"
+                    ON "PROJECT"."ID" = "PROJECT_ACCESS_ROLES"."PROJECT_ID"
+                INNER JOIN "MANAGEDUSERS_PROJECTS_ROLES"
+                    ON "MANAGEDUSERS_PROJECTS_ROLES"."PROJECT_ACCESS_ROLE_ID" = "PROJECT_ACCESS_ROLES"."ID"
+                INNER JOIN "MANAGEDUSER"
+                    ON "MANAGEDUSER"."ID" = "MANAGEDUSERS_PROJECTS_ROLES"."MANAGEDUSER_ID"
+                WHERE
+                    "MANAGEDUSER"."USERNAME" = :userName AND
+                    "PROJECT"."NAME" = :projectName
+                """.formatted(projectAclCondition);
+
+        final var params = new HashMap<>(projectAclConditionParams);
+
+        sqlQuery += " " + getOffsetLimitSqlClause();
+
+        final Query<?> query = pm.newQuery(Query.SQL, sqlQuery);
+        query.setNamedParameters(params);
+        return executeAndCloseResultList(query, Permission.class);
+    }
 }
