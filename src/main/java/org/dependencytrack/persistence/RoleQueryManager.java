@@ -132,7 +132,7 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
     }
 
     @Override
-    List<Permission> getUserProjectPermissions(final String username, final String projectName) {
+    public List<Permission> getUserProjectPermissions(final String username, final String projectName) {
         final UserPrincipal user = getUserPrincipal(username);
         final String columnName;
 

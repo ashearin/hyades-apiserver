@@ -1281,15 +1281,15 @@ public class QueryManager extends AlpineQueryManager {
         return getRoleQueryManager().getUnassignedRolePermissions(role);
     }
 
-    public List<? extends ProjectRole> getUserRoles(UserPrincipal user) {
+    public List<? extends ProjectRole> getUserRoles(final UserPrincipal user) {
         return getRoleQueryManager().getUserRoles(user);
     }
 
-    List<Permission> getUserProjectPermissions(final String username, final String projectName) {
+    public List<Permission> getUserProjectPermissions(final String username, final String projectName) {
         return getRoleQueryManager().getUserProjectPermissions(username, projectName);
     }
 
-    public boolean removeRoleFromUser(UserPrincipal user, Role role, Project project) {
+    public boolean removeRoleFromUser(final UserPrincipal user, final Role role, final Project project) {
         return getRoleQueryManager().removeRoleFromUser(user, role, project);
     }
 
