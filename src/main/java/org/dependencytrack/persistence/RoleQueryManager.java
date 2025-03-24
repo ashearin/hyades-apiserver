@@ -21,6 +21,7 @@ package org.dependencytrack.persistence;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.jdo.PersistenceManager;
@@ -68,11 +69,13 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
 
     @Override
     public Role createRole(final String name, final List<Permission> permissions) {
-        final Role role = new Role();
-        role.setName(name);
-        role.setPermissions(permissions);
+        return callInTransaction(() -> {
+            final Role role = new Role();
+            role.setName(name);
+            role.setPermissions(Set.copyOf(permissions));
 
-        return persist(role);
+            return persist(role);
+        });
     }
 
     @Override
@@ -86,14 +89,16 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
 
     @Override
     public Role getRole(final String uuid) {
-        final Query<Role> query = pm.newQuery(Role.class, "uuid == :uuid");
+        final Query<Role> query = pm.newQuery(Role.class, "uuid == :uuid")
+                .setNamedParameters(Map.of("uuid", uuid));
 
         return query.executeUnique();
     }
 
     @Override
     public List<? extends ProjectRole> getUserRoles(final UserPrincipal user) {
-        return JdbiFactory.withJdbiHandle(handle -> handle.attach(RoleDao.class).getUserRoles(user));
+        return JdbiFactory.withJdbiHandle(handle -> handle.attach(RoleDao.class)
+                .getUserRoles(user.getClass(), user.getUsername()));
     }
 
     public List<Project> getUnassignedProjects(final String username) {
@@ -101,7 +106,9 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
     }
 
     public List<Project> getUnassignedProjects(final UserPrincipal user) {
-        return JdbiFactory.withJdbiHandle(handle -> handle.attach(RoleDao.class).getUserUnassignedProjects(user));
+        return JdbiFactory.withJdbiHandle(handle -> handle.attach(RoleDao.class).getUserUnassignedProjects(
+                user.getClass(),
+                user.getUsername()));
     }
 
     public List<Permission> getUnassignedRolePermissions(final Role role) {
@@ -143,7 +150,7 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
             default -> {
                 return null;
             }
-        };
+        }
 
         final Query<Project> projectsQuery = pm.newQuery(Project.class)
                 .filter("name == :projectName")
@@ -184,13 +191,20 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
     @Override
     public boolean addRoleToUser(final UserPrincipal user, final Role role, final Project project) {
         return JdbiFactory.withJdbiHandle(
-                handle -> handle.attach(RoleDao.class).addRoleToUser(user, project.getId(), role.getId())) == 1;
+                handle -> handle.attach(RoleDao.class).addRoleToUser(
+                        user.getClass(),
+                        user.getId(),
+                        project.getId(),
+                        role.getId())) == 1;
     }
 
     @Override
     public boolean removeRoleFromUser(final UserPrincipal user, final Role role, final Project project) {
-        return JdbiFactory.withJdbiHandle(handle -> handle.attach(RoleDao.class).removeRoleFromUser(user,
-                project, role.getId())) > 0;
+        return JdbiFactory.withJdbiHandle(handle -> handle.attach(RoleDao.class).removeRoleFromUser(
+                user.getClass(),
+                user.getId(),
+                project.getName(),
+                role.getId())) > 0;
     }
 
 }
