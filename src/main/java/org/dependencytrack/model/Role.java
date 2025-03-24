@@ -146,10 +146,12 @@ public class Role implements Serializable {
                 .map(permission -> permission.getName())
                 .toList();
 
-        return "%s{id=%d, name='%s', permissions=%s}".formatted(
+        return "%s{id=%d, uuid='%s', name='%s', permissions=%s}".formatted(
                 getClass().getSimpleName(),
                 id,
+                uuid,
                 name,
                 permissionStrings);
     }
+
 }

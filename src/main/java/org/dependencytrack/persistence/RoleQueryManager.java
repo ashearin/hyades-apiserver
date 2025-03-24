@@ -89,10 +89,7 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
 
     @Override
     public Role getRole(final String uuid) {
-        final Query<Role> query = pm.newQuery(Role.class, "uuid == :uuid")
-                .setNamedParameters(Map.of("uuid", uuid));
-
-        return query.executeUnique();
+        return getObjectByUuid(Role.class, uuid, Role.FetchGroup.ALL.name());
     }
 
     @Override
