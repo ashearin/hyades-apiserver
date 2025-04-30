@@ -21,13 +21,11 @@ package org.dependencytrack.integrations.gitlab;
 import static org.dependencytrack.model.ConfigPropertyConstants.GITLAB_ENABLED;
 import static org.dependencytrack.persistence.jdbi.JdbiFactory.openJdbiHandle;
 
-import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.io.IOException;
 
 import org.dependencytrack.integrations.AbstractIntegrationPoint;
 import org.dependencytrack.model.Role;
@@ -69,7 +67,7 @@ public class GitLabIntegrationStateChanger extends AbstractIntegrationPoint {
                 LOGGER.info("GitLab integration disabled");
             }
 
-        } catch (IOException | URISyntaxException ex) {
+        } catch (RuntimeException ex) {
             LOGGER.error("An error occurred while changing Gitlab Integration State", ex);
             handleException(LOGGER, ex);
         }
