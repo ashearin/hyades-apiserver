@@ -179,7 +179,7 @@ public class GitLabClient {
 
                 JSONObject pageInfo = (JSONObject) projectsObject.get("pageInfo");
 
-                if (!(boolean) pageInfo.get("hasNextPage"))
+                if (pageInfo == null || !(boolean) pageInfo.get("hasNextPage"))
                     break;
 
                 variables.put("cursor", pageInfo.getAsString("endCursor"));

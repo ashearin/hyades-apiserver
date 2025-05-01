@@ -543,7 +543,7 @@ public class QueryManager extends AlpineQueryManager {
         final Permission viewPortfolio = getPermission(Permissions.Constants.VIEW_PORTFOLIO);
 
         // If a user has a role on any project, grant VIEW_PORTFOLIO permission
-        if (!userRoles.isEmpty() && !permissions.contains(viewPortfolio))
+        if (!userRoles.isEmpty() || !permissions.contains(viewPortfolio))
             permissions.add(viewPortfolio);
 
         return permissions.stream().toList();
