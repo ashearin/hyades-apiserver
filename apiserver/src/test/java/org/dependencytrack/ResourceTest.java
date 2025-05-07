@@ -136,7 +136,7 @@ public abstract class ResourceTest {
         // code base can leave such a broken state behind if they run into unexpected
         // errors. See: https://github.com/DependencyTrack/dependency-track/issues/2677
         if (!qm.getPersistenceManager().isClosed()
-         && qm.getPersistenceManager().currentTransaction().isActive()) {
+            && qm.getPersistenceManager().currentTransaction().isActive()) {
             qm.getPersistenceManager().currentTransaction().rollback();
         }
 
