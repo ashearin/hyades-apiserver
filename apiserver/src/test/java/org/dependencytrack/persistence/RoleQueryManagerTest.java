@@ -125,25 +125,21 @@ public class RoleQueryManagerTest extends PersistenceCapableTest {
 
     @Test
     public void testGetRole() {
-        String wrongRoleUuid = "0ff2c015-dd92-4db2-b371-126f5f81f80c";
-        String expectedRoleUuid = "c5aef6e4-863b-4f74-aeae-8cbfe7b4410b";
-
         final var wrongRole = new Role();
         wrongRole.setId(1);
         wrongRole.setName("maintainer");
-        wrongRole.setUuid(UUID.fromString(wrongRoleUuid));
         qm.persist(wrongRole);
 
         final var expectedRole = new Role();
         expectedRole.setId(2);
         expectedRole.setName("owner");
-        expectedRole.setUuid(UUID.fromString(expectedRoleUuid));
         qm.persist(expectedRole);
+
+        String expectedRoleUuid = expectedRole.getUuid().toString();
 
         Role actualRole = qm.getRole(expectedRoleUuid);
 
         Assert.assertEquals(expectedRole, actualRole);
-        // TODO: Check how this one is supposed to work.
     }
 
     @Test
