@@ -141,12 +141,12 @@ final class RoleQueryManager extends QueryManager implements IQueryManager {
         final String columnName;
 
         switch (user) {
-        case LdapUser ldapUser -> columnName = "LDAPUSER_ID";
-        case ManagedUser managedUser -> columnName = "MANAGEDUSER_ID";
-        case OidcUser oidcUser -> columnName = "OIDCUSER_ID";
-        default -> {
-            return null;
-        }
+            case LdapUser ldapUser -> columnName = "LDAPUSER_ID";
+            case ManagedUser managedUser -> columnName = "MANAGEDUSER_ID";
+            case OidcUser oidcUser -> columnName = "OIDCUSER_ID";
+            default -> {
+                return null;
+            }
         }
 
         final Query<Project> projectsQuery = pm.newQuery(Project.class)
