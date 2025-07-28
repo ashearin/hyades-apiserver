@@ -18,21 +18,19 @@
  */
 package org.dependencytrack.resources.v1;
 
-import alpine.Config;
 import alpine.common.logging.Logger;
 import alpine.event.framework.Event;
 import alpine.model.ConfigProperty;
 import alpine.notification.Notification;
 import alpine.notification.NotificationLevel;
 import alpine.server.auth.PermissionRequired;
-import alpine.server.filters.ResourceAccessRequired;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.SignatureException;
+import alpine.server.filters.ResourceAccessRequired;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -42,6 +40,23 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.json.Json;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonReader;
+import jakarta.json.JsonString;
+import jakarta.validation.Validator;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.BOMInputStream;
 import org.apache.commons.lang3.StringUtils;
@@ -78,23 +93,8 @@ import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataParam;
 import org.owasp.security.logging.SecurityMarkers;
 
-import jakarta.json.Json;
-import jakarta.json.JsonArray;
-import jakarta.json.JsonReader;
-import jakarta.json.JsonString;
-import jakarta.validation.Validator;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.DefaultValue;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.PUT;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
@@ -107,8 +107,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
-
-import static java.util.Objects.requireNonNull;
 import static java.util.function.Predicate.not;
 import static org.dependencytrack.model.ConfigPropertyConstants.BOM_VALIDATION_MODE;
 import static org.dependencytrack.model.ConfigPropertyConstants.BOM_VALIDATION_TAGS_EXCLUSIVE;
@@ -316,14 +314,13 @@ public class BomResource extends AbstractApiResource {
     @ResourceAccessRequired
     public Response uploadBom(@Parameter(required = true) BomSubmitRequest request) {
         final Validator validator = getValidator();
-        final ProcessingResult processingResult;
         if (request.getProject() != null) { // behavior in v3.0.0
             failOnValidationError(
                     validator.validateProperty(request, "project"),
                     validator.validateProperty(request, "bom")
             );
             try (QueryManager qm = new QueryManager()) {
-                processingResult = qm.callInTransaction(() -> {
+                return qm.callInTransaction(() -> {
                     final Project project = qm.getObjectByUuid(Project.class, request.getProject());
                     return process(qm, project, request.getBom());
                 });
@@ -335,7 +332,7 @@ public class BomResource extends AbstractApiResource {
                     validator.validateProperty(request, "bom")
             );
             try (final var qm = new QueryManager()) {
-                processingResult = qm.callInTransaction(() -> {
+                return qm.callInTransaction(() -> {
                     Project project = qm.getProject(request.getProjectName(), request.getProjectVersion());
                     if (project == null && request.isAutoCreate()) {
                         if (hasPermission(Permissions.Constants.PORTFOLIO_MANAGEMENT) || hasPermission(Permissions.Constants.PORTFOLIO_MANAGEMENT_CREATE) || hasPermission(Permissions.Constants.PROJECT_CREATION_UPLOAD)) {
@@ -355,27 +352,20 @@ public class BomResource extends AbstractApiResource {
                                 }
 
                                 if (parent == null) { // if parent project is specified but not found
-                                    final var response = Response.status(Response.Status.NOT_FOUND).entity("The parent project could not be found.").build();
-                                    return new ProcessingResult(response, null);
+                                    return Response.status(Response.Status.NOT_FOUND).entity("The parent project could not be found.").build();
                                 }
                                 requireAccess(qm, parent, "Access to the specified parent project is forbidden");
                             }
                             createNewProject(request.getProjectName(), request.getProjectVersion(), request.getProjectTags(), parent, request.isLatestProjectVersion(), null);
                         } else {
-                            final var response = Response.status(Response.Status.UNAUTHORIZED).entity("The principal does not have permission to create project.").build();
-                            return new ProcessingResult(response, null);
+                            return Response.status(Response.Status.UNAUTHORIZED)
+                                    .entity("The principal does not have permission to create project.").build();
                         }
                     }
                     return process(qm, project, request.getBom());
                 });
             }
         }
-
-        if (processingResult.event() != null) {
-            Event.dispatch(processingResult.event());
-        }
-
-        return processingResult.response();
     }
 
     @POST
@@ -401,10 +391,13 @@ public class BomResource extends AbstractApiResource {
                     cpc.getGroupName(),
                     cpc.getPropertyName());
 
-            if (qm.isEnabled(GITLAB_ENABLED))
+            ConfigProperty gitLabIntegrationConfigProperty = propertyGetter.apply(GITLAB_ENABLED);
+            if (gitLabIntegrationConfigProperty == null
+                    || !Boolean.parseBoolean(gitLabIntegrationConfigProperty.getPropertyValue()))
                 return Response.notModified("GitLab integration not enabled").build();
 
-            if (qm.isEnabled(GITLAB_SBOM_PUSH_ENABLED))
+            ConfigProperty sbomPushConfigProperty = propertyGetter.apply(GITLAB_SBOM_PUSH_ENABLED);
+            if (sbomPushConfigProperty == null || !Boolean.parseBoolean(sbomPushConfigProperty.getPropertyValue()))
                 return Response.notModified("GitLab SBOM push functionality not enabled").build();
 
             Boolean autoCreateProject = Boolean
@@ -415,8 +408,6 @@ public class BomResource extends AbstractApiResource {
                         .build();
 
             ConfigProperty gitLabUrlProperty = propertyGetter.apply(GITLAB_URL);
-            String alpineIssuerProperty = Config.getInstance().getProperty(Config.AlpineKey.OIDC_ISSUER);
-            String gitlabUrl = StringUtils.defaultIfBlank(alpineIssuerProperty, gitLabUrlProperty.getPropertyValue());
             ConfigProperty gitLabJwksPathProperty = propertyGetter.apply(GITLAB_JWKS_PATH);
 
             // Get the key id (kid) from the JWT header
@@ -424,7 +415,8 @@ public class BomResource extends AbstractApiResource {
             String kid = (String) new ObjectMapper().readValue(headerJson, Map.class).get("kid");
 
             Claims claims = Jwts.parser()
-                    .verifyWith(GitLabClient.getPublicKeyFromJwks(gitlabUrl, gitLabJwksPathProperty.getPropertyValue(), kid))
+                    .verifyWith(GitLabClient.getPublicKeyFromJwks(gitLabUrlProperty.getPropertyValue(),
+                            gitLabJwksPathProperty.getPropertyValue(), kid))
                     .build()
                     .parseSignedClaims(idToken)
                     .getPayload();
@@ -437,8 +429,12 @@ public class BomResource extends AbstractApiResource {
                             : GitLabClient.REF_PATH_CLAIM, String.class);
             Project project = qm.getProject(projectName, projectVersion);
 
-            final GitLabRole gitLabRole = GitLabRole
-                    .valueOf(claims.get(GitLabClient.USER_ACCESS_LEVEL_CLAIM, String.class).toUpperCase());
+            String accessLevel = claims.get(GitLabClient.USER_ACCESS_LEVEL_CLAIM, String.class);
+            if (accessLevel == null) {
+                return Response.status(Response.Status.UNAUTHORIZED)
+                        .entity("Missing user_access_level claim in token").build();
+            }
+            final GitLabRole gitLabRole = GitLabRole.valueOf(accessLevel.toUpperCase());
             Role role = (gitLabRole != null)
                     ? qm.getRoleByName(gitLabRole.getDescription())
                     : null;
@@ -472,21 +468,21 @@ public class BomResource extends AbstractApiResource {
 
             return uploadBom(bomSubmitRequest);
         } catch (SignatureException e) {
-            return Response.status(Response.Status.BAD_REQUEST)
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("Received token that did not pass signature verification").build();
         } catch (ExpiredJwtException e) {
-            return Response.status(Response.Status.BAD_REQUEST).entity("Received expired token").build();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Received expired token").build();
         } catch (MalformedJwtException e) {
-            return Response.status(Response.Status.BAD_REQUEST).entity("Received malformed token").build();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Received malformed token").build();
         } catch (UnsupportedJwtException | IllegalArgumentException e) {
             LOGGER.error(SecurityMarkers.SECURITY_FAILURE, e.getMessage());
-            return Response.status(Response.Status.BAD_REQUEST).entity("Received unsupported JWT").build();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Received unsupported JWT").build();
         } catch (IOException e) {
-            LOGGER.error(SecurityMarkers.EVENT_FAILURE, "Error reading or parsing the JWT header or JWKS: " + e.getMessage());
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Error reading or parsing the JWT header or JWKS: " + e.getMessage()).build();
         } catch (Exception e) {
-            LOGGER.error(SecurityMarkers.EVENT_FAILURE, "An error occured in uploadBomGitLab: " + e.getMessage());
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("An error occured in uploadBomGitLab: " + e.getMessage()).build();
         }
     }
 
@@ -548,17 +544,16 @@ public class BomResource extends AbstractApiResource {
             @DefaultValue("false") @FormDataParam("isLatest") boolean isLatest,
             @Parameter(schema = @Schema(type = "string")) @FormDataParam("bom") final List<FormDataBodyPart> artifactParts
     ) {
-        final ProcessingResult processingResult;
         if (projectUuid != null) { // behavior in v3.0.0
             try (QueryManager qm = new QueryManager()) {
-                processingResult = qm.callInTransaction(() -> {
+                return qm.callInTransaction(() -> {
                     final Project project = qm.getObjectByUuid(Project.class, projectUuid);
                     return process(qm, project, artifactParts);
                 });
             }
         } else { // additional behavior added in v3.1.0
             try (QueryManager qm = new QueryManager()) {
-                processingResult = qm.callInTransaction(() -> {
+                return qm.callInTransaction(() -> {
                     final String trimmedProjectName = StringUtils.trimToNull(projectName);
                     final String trimmedProjectVersion = StringUtils.trimToNull(projectVersion);
                     Project project = qm.getProject(trimmedProjectName, trimmedProjectVersion);
@@ -576,8 +571,7 @@ public class BomResource extends AbstractApiResource {
                                 }
 
                                 if (parent == null) { // if parent project is specified but not found
-                                    final var response = Response.status(Response.Status.NOT_FOUND).entity("The parent project could not be found.").build();
-                                    return new ProcessingResult(response, null);
+                                    return Response.status(Response.Status.NOT_FOUND).entity("The parent project could not be found.").build();
                                 }
                                 requireAccess(qm, parent, "Access to the specified parent project is forbidden");
                             }
@@ -586,34 +580,20 @@ public class BomResource extends AbstractApiResource {
                                     : null;
                             createNewProject(projectName, projectVersion, tags, parent, isLatest, null);
                         } else {
-                            final var response = Response.status(Response.Status.UNAUTHORIZED).entity("The principal does not have permission to create project.").build();
-                            return new ProcessingResult(response, null);
+                            return Response.status(Response.Status.UNAUTHORIZED)
+                                    .entity("The principal does not have permission to create project.").build();
                         }
                     }
                     return process(qm, project, artifactParts);
                 });
             }
         }
-
-        if (processingResult.event() != null) {
-            Event.dispatch(processingResult.event());
-        }
-
-        return processingResult.response();
-    }
-
-    private record ProcessingResult(Response response, BomUploadEvent event) {
-
-        private ProcessingResult {
-            requireNonNull(response, "response must not be null");
-        }
-
     }
 
     /**
      * Common logic that processes a BOM given a project and encoded payload.
      */
-    private ProcessingResult process(QueryManager qm, Project project, String encodedBomData) {
+    private Response process(QueryManager qm, Project project, String encodedBomData) {
         if (project != null) {
             requireAccess(qm, project);
 
@@ -624,28 +604,25 @@ public class BomResource extends AbstractApiResource {
                 bomFileMetadata = validateAndStoreBom(IOUtils.toByteArray(byteOrderMarkInputStream), project);
             } catch (IOException e) {
                 LOGGER.error("An unexpected error occurred while validating or storing a BOM uploaded to project: " + project.getUuid(), e);
-                final var response = Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-                return new ProcessingResult(response, null);
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
             }
 
             final BomUploadEvent bomUploadEvent = new BomUploadEvent(qm.detach(Project.class, project.getId()), bomFileMetadata);
             qm.createWorkflowSteps(bomUploadEvent.getChainIdentifier());
+            Event.dispatch(bomUploadEvent);
 
             BomUploadResponse bomUploadResponse = new BomUploadResponse();
             bomUploadResponse.setToken(bomUploadEvent.getChainIdentifier());
-            final var response = Response.ok(bomUploadResponse).build();
-
-            return new ProcessingResult(response, bomUploadEvent);
+            return Response.ok(bomUploadResponse).build();
         } else {
-            final var response = Response.status(Response.Status.NOT_FOUND).entity("The project could not be found.").build();
-            return new ProcessingResult(response, null);
+            return Response.status(Response.Status.NOT_FOUND).entity("The project could not be found.").build();
         }
     }
 
     /**
      * Common logic that processes a BOM given a project and list of multi-party form objects containing decoded payloads.
      */
-    private ProcessingResult process(QueryManager qm, Project project, List<FormDataBodyPart> artifactParts) {
+    private Response process(QueryManager qm, Project project, List<FormDataBodyPart> artifactParts) {
         for (final FormDataBodyPart artifactPart : artifactParts) {
             final BodyPartEntity bodyPartEntity = (BodyPartEntity) artifactPart.getEntity();
             if (project != null) {
@@ -657,8 +634,7 @@ public class BomResource extends AbstractApiResource {
                     bomFileMetadata = validateAndStoreBom(IOUtils.toByteArray(byteOrderMarkInputStream), project, artifactPart.getMediaType());
                 } catch (IOException e) {
                     LOGGER.error("An unexpected error occurred while validating or storing a BOM uploaded to project: " + project.getUuid(), e);
-                    final var response = Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-                    return new ProcessingResult(response, null);
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
                 }
 
                 // todo: make option to combine all the bom data so components are reconciled in a single pass.
@@ -666,18 +642,16 @@ public class BomResource extends AbstractApiResource {
                 final BomUploadEvent bomUploadEvent = new BomUploadEvent(qm.detach(Project.class, project.getId()), bomFileMetadata);
 
                 qm.createWorkflowSteps(bomUploadEvent.getChainIdentifier());
+                Event.dispatch(bomUploadEvent);
 
                 BomUploadResponse bomUploadResponse = new BomUploadResponse();
                 bomUploadResponse.setToken(bomUploadEvent.getChainIdentifier());
-                final var response = Response.ok(bomUploadResponse).build();
-
-                return new ProcessingResult(response, bomUploadEvent);
+                return Response.ok(bomUploadResponse).build();
             } else {
-                final var response = Response.status(Response.Status.NOT_FOUND).entity("The project could not be found.").build();
-                return new ProcessingResult(response, null);
+                return Response.status(Response.Status.NOT_FOUND).entity("The project could not be found.").build();
             }
         }
-        return new ProcessingResult(Response.ok().build(), null);
+        return Response.ok().build();
     }
 
     private FileMetadata validateAndStoreBom(final byte[] bomBytes, final Project project) throws IOException {
